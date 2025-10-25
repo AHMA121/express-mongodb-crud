@@ -5,8 +5,30 @@ const router = express.Router();
 
 router.get('/', async (req,res) => {
     try {
-        const users = await User.find();
-        res.json(users);
+        const {name , sort , from , page = 1 , limit =10 } =req.query;
+
+        const filter = {};
+        if (name) filter.name = { $regex: name, $options: 'i'};
+        if (from) filter.createdAt = { $gte: new Date(from) };
+
+        const [field, order ] = sort ? sort.split(':') : ['createdAt', 'asc'];
+
+        const skip = (page -1) * limit;
+
+        const users = await User.find(filter)
+        .sort({ [field]: order === 'desc' ? -1 : 1})
+        .skip(skip)
+        .limit(Number(limit));
+
+        const totalUsers = await User.countDocuments(filter);
+        const totalPages = Math.ceil(totalUsers / limit );
+
+        res.json({
+            page: Number(page),
+            totalPages,
+            totalUsers,
+            results: users,
+        });
     } catch (err) {
         res.status(500).json({error: err.message});
     }
